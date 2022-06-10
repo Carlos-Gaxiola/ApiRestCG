@@ -8,7 +8,7 @@ import com.encora.framework.controller.RestController;
 
 import java.util.List;
 
-@RestController("/book")
+@RestController(url = "/book")
 public class BookController implements Controller<Book> {
 
     private BookService bookService;

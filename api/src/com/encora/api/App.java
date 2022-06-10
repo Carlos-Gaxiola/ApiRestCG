@@ -7,9 +7,8 @@ import com.encora.api.model.Book;
 import com.encora.framework.server.ApplicationServer;
 
 public class App {
-
-    public static void main(String[] args) throws IOException {
-        ApplicationServer.run(args, new BookController(), Book.class);
+    public static void main(String[] args) throws IOException, ClassNotFoundException {
+        ApplicationServer.run(args, new BookController(), Book.class, App.class);
 
     }
 
