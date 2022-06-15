@@ -1,33 +1,40 @@
 package com.encora.framework.server;
 
-import com.encora.framework.controller.Controller;
-import com.encora.framework.controller.RestController;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
-import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
-import java.net.URL;
 import java.util.ArrayList;
-import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Scanner;
+import java.util.Map;
 
 
 public class ApplicationServer {
 
     private static final int PORT = 3001;
+    public static String path;
 
-    public static void run(String[] args, Controller controller, Class<?> clazz, Class<?> main) throws IOException, ClassNotFoundException {
+    public static void run(String[] args, Class<?> main) throws IOException, ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchMethodException {
         HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
 
-        ControllerReader cr = new ControllerReader();
-        cr.controllerReader(controller, main);
+        GetRestControllers restControllers = new GetRestControllers();
+        Map controllers = restControllers.getRestControllers(main);
 
-        server.createContext("/books", new RootHandler(controller, clazz));
+
+        Iterator<Map.Entry<String, Class>> itr = controllers.entrySet().iterator();
+
+        while(itr.hasNext())
+        {
+            Map.Entry<String, Class> entry = itr.next();
+            String key = entry.getKey();
+            Class<?> clazz = Class.forName(String.valueOf(entry.getValue()).substring(String.valueOf(entry.getValue()).indexOf(" ") + 1));
+            server.createContext(key, new RootHandler(clazz));
+        }
+
         server.setExecutor(null);
         server.start();
 
     }
-
 }

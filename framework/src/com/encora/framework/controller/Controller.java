@@ -3,7 +3,6 @@ package com.encora.framework.controller;
 import java.util.List;
 
 public interface Controller <T>{
-
     List<T> getAll();
 
     T get(String id);
