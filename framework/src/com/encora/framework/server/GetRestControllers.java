@@ -10,7 +10,7 @@ import java.util.*;
 
 public class GetRestControllers {
     public static Map getRestControllers(Class<?> main) throws IOException, ClassNotFoundException {
-        Map<String, Class<?>> controllers = new HashMap<String, Class<?>>();
+        Map<String, Class<?>> controllers = new HashMap<>();
         List<String> classes = new ArrayList<>();
         Package p = main.getPackage();
         String packagesSlashes = p.getName().replace(".", "/");

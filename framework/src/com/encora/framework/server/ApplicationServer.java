@@ -23,14 +23,14 @@ public class ApplicationServer {
         Map controllers = restControllers.getRestControllers(main);
 
 
+
         Iterator<Map.Entry<String, Class>> itr = controllers.entrySet().iterator();
 
         while(itr.hasNext())
         {
             Map.Entry<String, Class> entry = itr.next();
-            String key = entry.getKey();
-            Class<?> clazz = Class.forName(String.valueOf(entry.getValue()).substring(String.valueOf(entry.getValue()).indexOf(" ") + 1));
-            server.createContext(key, new RootHandler(clazz));
+            Object object = entry.getValue().getDeclaredConstructor().newInstance();
+            server.createContext(entry.getKey(), new RootHandler(object));
         }
 
         server.setExecutor(null);

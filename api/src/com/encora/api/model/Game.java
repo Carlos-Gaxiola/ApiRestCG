@@ -11,6 +11,16 @@ public class Game {
     public Game() {
     }
 
+    @Override
+    public String toString() {
+        return "Game{" +
+                "code='" + code + '\'' +
+                ", title='" + title + '\'' +
+                ", genre='" + genre + '\'' +
+                ", year=" + year +
+                '}';
+    }
+
     public Game(String code, String title, String genre, int year) {
         this.code = code;
         this.title = title;

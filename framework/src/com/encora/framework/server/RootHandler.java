@@ -25,21 +25,26 @@ public class RootHandler<T> implements HttpHandler {
     private final T controller;
 
     public RootHandler(T controller) throws InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchMethodException, ClassNotFoundException {
-        this.controller = (T) Class.forName(String.valueOf(controller).substring(String.valueOf(controller).indexOf(" ") + 1));;
+        this.controller = controller;
     }
 
     @Override
     public void handle(HttpExchange he) throws IOException {
-        String route = "/" + he.getRequestURI().getPath().split("/")[1];
+        String route = null;
+        if(he.getRequestURI().getPath().split("/").length == 3){
+            route = he.getRequestURI().getPath().split("/")[2];
+        }
+
         String method = he.getRequestMethod();
 
         switch (method) {
-            case "GET" -> handleGet(he, method);
-            case "POST" -> handlePost(he, method);
-            case "PUT" -> handlePut(he, method);
-            case "DELETE" -> handleDelete(he, method);
+            case "GET" -> handleGet(he, method, route);
+            case "POST" -> handlePost(he, method, route);
+            case "PUT" -> handlePut(he, method, route);
+            case "DELETE" -> handleDelete(he, method, route);
             default -> requestHandler(he, 400, "Invalid request");
         }
+
 
     }
 
@@ -47,10 +52,10 @@ public class RootHandler<T> implements HttpHandler {
         return "/" + he.getRequestURI().getPath().split("/")[1];
     }
 
-    private void handleDelete(HttpExchange he, String method) {
+    private void handleDelete(HttpExchange he, String method, String route) {
         try {
-            var code = he.getRequestURI().getPath().split("/")[2];
-            Method m = obtainMethod(method);
+            String code = he.getRequestURI().getPath().split("/")[2];
+            Method m = obtainMethod(method, route);
 
             m.invoke(controller, code);
 
@@ -61,20 +66,29 @@ public class RootHandler<T> implements HttpHandler {
         }
     }
 
-    private void handlePut(HttpExchange he, String method) {
+    private void handlePut(HttpExchange he, String method, String route) {
         try {
-            var code = he.getRequestURI().getPath().split("/")[2];
-            var body = transformRequest(he.getRequestBody());
-            Method m = obtainMethod(method);
+            String code = he.getRequestURI().getPath().split("/")[2];
+            String body = transformRequest(he.getRequestBody());
+            Method m = obtainMethod(method, route);
+            String methodString = m.toString().split(" ")[2];
+            String classToFind = methodString.substring(0, methodString.indexOf(".update"));
+            Class<?> clazz = Class.forName(classToFind);
+            String cls = null;
+            for (Method mt: clazz.getDeclaredMethods()) {
+                if (mt.getName().contains("update")) {
+                    cls = mt.toString().split(" ")[1];
+                    break;
+                }
+            }
 
-            Class<?> cls = Class.forName(m.toString().split(" ")[1]);
+            Class<?> klass = Class.forName(cls);
 
-            Object elementToEdit = JSONSerializer.deserialize(cls, body);
+            Object element = JSONSerializer.deserialize(klass, body);
 
-            elementToEdit = m.invoke(controller, code, elementToEdit);
+            element = m.invoke(controller, code, element);
 
-            String elementEdited = JSONSerializer.serilaize(elementToEdit);
-
+            String elementEdited = JSONSerializer.serilaize(element);
 
             requestHandler(he, 201, elementEdited);
 
@@ -91,9 +105,9 @@ public class RootHandler<T> implements HttpHandler {
         }
     }
 
-    private void handlePost(HttpExchange he, String method) {
+    private void handlePost(HttpExchange he, String method, String route) {
         try {
-            Method m = obtainMethod(method);
+            Method m = obtainMethod(method, route);
 
             String body = transformRequest(he.getRequestBody());
 
@@ -114,15 +128,14 @@ public class RootHandler<T> implements HttpHandler {
         }
     }
 
-    private void handleGet(HttpExchange he, String method) {
+    private void handleGet(HttpExchange he, String method, String route) {
         try {
-            var code = he.getRequestURI().getPath().split("/");
-            Method m = obtainMethod(method);
+            String[] code = he.getRequestURI().getPath().split("/");
+            Method m = obtainMethod(method, route);
 
             if (code.length < 3) {
                 List<String> response = new ArrayList<>();
-                System.out.println(controller);
-                List<?> data = (List<?>) m.invoke(controller, null);
+                List<?> data = (List<?>) m.invoke(controller);
 
                 data.forEach(element -> {
                     String serializedObject;
@@ -152,12 +165,20 @@ public class RootHandler<T> implements HttpHandler {
                     os.close();
                 }
                 else {
-                    requestHandler(he, 200, "There are no books stored");
+                    requestHandler(he, 200, "There are no elements stored");
 
                 }
 
-            }  else {
-                var message = "There are too many parameters in your request";
+
+            } else if (code.length == 3) {
+                String response = JSONSerializer.serilaize(m.invoke(controller, route));
+
+                requestHandler(he, 200, response);
+
+            }
+
+            else {
+                String message = "There are too many parameters in your request";
 
                 requestHandler(he, 400, message);
 
@@ -171,35 +192,46 @@ public class RootHandler<T> implements HttpHandler {
             throw new RuntimeException(e);
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
         }
     }
 
-    public Method obtainMethod(String method) throws ClassNotFoundException {
+    public Method obtainMethod(String method, String route) throws ClassNotFoundException {
         Method methodToInvoke = null;
-        Class<?> clazz = Class.forName(String.valueOf(controller).substring(String.valueOf(controller).indexOf(" ") + 1));
-        Method[] methods = clazz.getDeclaredMethods();
+        Method[] methods = controller.getClass().getDeclaredMethods();
         for (Method m: methods) {
             switch (method) {
                 case "GET":
                     Get getAnnotation = m.getAnnotation(Get.class);
-                    if(getAnnotation != null && getAnnotation.value().equals("/")){
-                        methodToInvoke = m;
+                    if(route == null){
+                        if(getAnnotation != null && getAnnotation.value().equals("/")){
+                            methodToInvoke = m;
+                        }
+                    }else{
+                        if(getAnnotation != null && getAnnotation.value().equals("/{code}")){
+                            methodToInvoke = m;
+                        }
                     }
+                    break;
                 case "POST":
                     Post postAnnotation = m.getAnnotation(Post.class);
                     if(postAnnotation != null && postAnnotation.value().equals("/")){
                         methodToInvoke = m;
                     }
+                    break;
                 case "PUT":
                     Put putAnnotation = m.getAnnotation(Put.class);
                     if(putAnnotation != null && putAnnotation.value().equals("/{code}")){
                         methodToInvoke = m;
                     }
+                    break;
                 case "DELETE":
                     Delete deleteAnnotation = m.getAnnotation(Delete.class);
                     if(deleteAnnotation != null && deleteAnnotation.value().equals("/{code}")){
                         methodToInvoke = m;
                     }
+                    break;
             }
         }
         return methodToInvoke;
@@ -218,9 +250,9 @@ public class RootHandler<T> implements HttpHandler {
     }
 
     private String transformRequest(InputStream body) throws IOException {
-        var inputStreamReader = new InputStreamReader(body, StandardCharsets.UTF_8);
-        var bufferedReader = new BufferedReader(inputStreamReader);
-        var stringBuilder = new StringBuilder();
+        InputStreamReader inputStreamReader = new InputStreamReader(body, StandardCharsets.UTF_8);
+        BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+        StringBuilder stringBuilder = new StringBuilder();
         int character;
         while ((character = bufferedReader.read()) != -1) {
             stringBuilder.append((char) character);
